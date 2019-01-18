@@ -111,9 +111,9 @@ extrhappening
 cchappeningresponses <- CCHappeningDataBind %>%
   select(Answer)
 
-CCHappeningDataBind$prepost <- plyr::mapvalues(CCHappeningDataBind$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCHappeningDataBind$prepost <- plyr::mapvalues(CCHappeningDataBind$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
-CCHappeningDataBind$prepost <- factor(CCHappeningDataBind$prepost, c("end","beginning"))
+CCHappeningDataBind$prepost <- factor(CCHappeningDataBind$prepost, c("End","Beginning"))
 
 # rename the responses and order the data
 cchappeningresponses$Answer <- plyr::mapvalues(cchappeningresponses$Answer, from = c("YesExtrSure",
@@ -183,16 +183,16 @@ cchappeninglong$CCHappening01 <-  plyr::mapvalues(cchappeninglong$CCHappening, f
 
 cchappeninglong$CCHappening01 <- as.numeric(as.character(cchappeninglong$CCHappening01))
 
-cchappeninglong$PrevPost <- plyr::mapvalues(cchappeninglong$PrevPost, from = c("CC_Happening_pre","CC_Happening_post"), to = c("beginning", "end"))
+cchappeninglong$PrevPost <- plyr::mapvalues(cchappeninglong$PrevPost, from = c("CC_Happening_pre","CC_Happening_post"), to = c("Beginning", "End"))
 
-cchappeninglong$PrevPost <- factor(cchappeninglong$PrevPost, levels=c("beginning", "end"))
+cchappeninglong$PrevPost <- factor(cchappeninglong$PrevPost, levels=c("Beginning", "End"))
 
 cchappeningrxnplot <- cchappeninglong %>%
   ggplot(aes(x=PrevPost, y=CCHappening01, group=ID)) +
   geom_line(position=position_jitter(w=0.02, h=0.02),alpha=0.3) +
   ggtitle("Paired responses") +
   theme(plot.title = element_text(hjust = 0.5)) +
-  xlab("Survey timing") +
+  xlab("Time of semester") +
   ylab("Is climate change happening? \n(1 = No, and I'm extremely sure, \n9 = Yes, and I'm extremely sure)") +
   theme_bw()
 
@@ -219,6 +219,67 @@ posthappening01 <- as.numeric(as.character(posthappening01))
 SIGN.test(x = prehappening01, y = posthappening01, alternative = "two.sided",
           conf.level = 0.95)
 ```
+
+### Jitter plot heat map 
+```{r, jitter plot heat map figure of cchappening data}
+cchappeningwide <- dplyr::select(cctookboth, CC_Happening_pre, CC_Happening_post)
+
+cchappeningwide <- cchappeningwide %>%
+  filter(CC_Happening_pre != "NA" & CC_Happening_post != "NA" )
+
+cchappeningwide$CC_Happening_pre <- factor(cchappeningwide$CC_Happening_pre, 
+                                 c("NoExtrSure", "NoVerySure","NoSomeSure","NoNotSure","DK","YesNotSure","YesSomeSure","YesVerySure","YesExtrSure"))
+
+cchappeningwide$CC_Happening_post <- factor(cchappeningwide$CC_Happening_post, 
+                                 c("NoExtrSure", "NoVerySure","NoSomeSure","NoNotSure","DK","YesNotSure","YesSomeSure","YesVerySure","YesExtrSure"))
+
+correlationplot <- ggplot(cchappeningwide, aes(x=CC_Happening_pre, y=CC_Happening_post)) +
+  geom_jitter(w=0.02, h=0.02,alpha=0.3)
+
+correlationplot
+
+```
+
+### trying a regular heat map
+```{r, did individual views on whether climate change is happening change during semester?}
+cchappeningwide <- dplyr::select(cctookboth, CC_Happening_pre, CC_Happening_post)
+
+cchappeningwide$ID <- seq.int(nrow(cchappeningwide))
+
+cchappeninglong <- cchappeningwide %>%
+  filter(CC_Happening_pre != "NA" & CC_Happening_post != "NA" ) %>%
+  gather(PrevPost,CCHappening,CC_Happening_pre:CC_Happening_post)
+
+cchappeninglong$CCHappening01 <-  plyr::mapvalues(cchappeninglong$CCHappening, from = c("NoExtrSure", "NoVerySure","NoSomeSure","NoNotSure","DK","YesNotSure","YesSomeSure","YesVerySure","YesExtrSure"), to = c(1,2,3,4,5,6,7,8,9))
+
+cchappeninglong$CCHappening01 <- as.numeric(as.character(cchappeninglong$CCHappening01))
+
+cchappeninglong$PrevPost <- plyr::mapvalues(cchappeninglong$PrevPost, from = c("CC_Happening_pre","CC_Happening_post"), to = c("Pre", "Post"))
+
+cchappeninglong$PrevPost <- factor(cchappeninglong$PrevPost, levels=c("Pre", "Post"))
+
+cchappeninglong2 <- subset(cchappeninglong, select = -c(CCHappening)) %>%
+  filter(CCHappening01 != "") %>%
+  filter(CCHappening01 != "NA")
+
+cchappeningwide2 <- cchappeninglong2 %>%
+  spread(PrevPost, CCHappening01) 
+
+cchappeningjointresponse <- cchappeningwide2 %>%
+  unite_("pre_post", c("Pre","Post"))
+
+cchappeningjointresponsesummary <- cchappeningjointresponse %>%
+  group_by(pre_post) %>%
+  summarise(n=n()) %>%
+  mutate(rel.freq = round(100 * n/sum(n), 0))
+
+cchappeningjointresponsesummary
+
+##GAVE UP HERE!
+  
+```
+
+
 
 ### Making a figure for the manuscript
 ```{r, combined figure showing student views on climate change}
@@ -329,7 +390,7 @@ CCBeliefsDataBindAll <- CCBeliefsDataBind
 
 CCBeliefsDataBindAll$Answer <- plyr::mapvalues(CCBeliefsDataBindAll$Answer , from = c("Both", "Humans", "Natural", "Other", "ExtentUnknown","NotHappening"), to = c("Equally humans and natural","Mostly humans", "Mostly natural", "Other", "Contributions unknown or unknowable", "Climate change is not happening"))
 
-CCBeliefsDataBindAll$prepost <- plyr::mapvalues(CCBeliefsDataBindAll$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCBeliefsDataBindAll$prepost <- plyr::mapvalues(CCBeliefsDataBindAll$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
 CCbeliefssummaryall <- CCBeliefsDataBindAll %>%
   filter(Answer != "") %>%
@@ -350,17 +411,21 @@ CCbeliefssummaryall$Answer <- factor(CCbeliefssummaryall$Answer,
                                    "Mostly humans"))
 
 
+CCBeliefsDataBindAll$prepost <- factor(CCBeliefsDataBindAll$prepost,
+                                       c("Beginning","End"))
+
 ccbeliefsstackedbarplot <- ggplot(CCbeliefssummaryall, aes(y=rel.freq, x=prepost)) + 
     geom_col(aes(fill=Answer)) +
   ylab("Percent of responses") +
-  xlab("Time of survey") +
+  xlab("Time of semester") +
   scale_fill_manual(values=c("gray","#8c510a","#d8b365","#f6e8c3","#ABD9D5","#01665e")) +
-  ggtitle("Which best captures your beliefs about the cause(s) of climate change?")
+  ggtitle("Which best captures your beliefs \nabout the cause(s) of climate change?") +
+  guides(fill=guide_legend(title="Response"))
   
 
   ccbeliefsstackedbarplot
 
-save_plot("ccbeliefsstackedbarplot.jpg", ccbeliefsstackedbarplot, base_width = 10, base_height = 5)
+save_plot("ccbeliefsstackedbarplot.jpg", ccbeliefsstackedbarplot, base_width = 6.5, base_height = 5)
 
 ```
 Summary: the number of students who agreed with the statement "Scientists have a good understanding of whether climate change is occurring" increased from 93% to 98% over the course of the semester. Most notably, the number of students who strongly agreed with that statement increased from 56% to 89%. 
@@ -1932,9 +1997,9 @@ CCHappeningPrePostPlotSideBySidew18
 cchappeningresponsesw18 <- CCHappeningDataBindw18 %>%
   select(Answer)
 
-CCHappeningDataBindw18$prepost <- plyr::mapvalues(CCHappeningDataBindw18$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCHappeningDataBindw18$prepost <- plyr::mapvalues(CCHappeningDataBindw18$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
-CCHappeningDataBindw18$prepost <- factor(CCHappeningDataBindw18$prepost, c("end","beginning"))
+CCHappeningDataBindw18$prepost <- factor(CCHappeningDataBindw18$prepost, c("End","Beginning"))
 
 # rename the responses and order the data
 cchappeningresponsesw18$Answer <- plyr::mapvalues(cchappeningresponsesw18$Answer, from = c("YesExtrSure",
