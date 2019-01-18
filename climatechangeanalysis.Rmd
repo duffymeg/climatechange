@@ -396,7 +396,7 @@ CCbeliefssummaryall <- CCBeliefsDataBindAll %>%
   filter(Answer != "") %>%
   group_by(prepost,Answer) %>%
   summarise(n=n()) %>%
-  mutate(rel.freq = round(100 * n/sum(n), 0))
+  mutate(rel.freq = round(100 * n/sum(n), digits=1))
 
 CCbeliefssummaryall
 
@@ -420,7 +420,8 @@ ccbeliefsstackedbarplot <- ggplot(CCbeliefssummaryall, aes(y=rel.freq, x=prepost
   xlab("Time of semester") +
   scale_fill_manual(values=c("gray","#8c510a","#d8b365","#f6e8c3","#ABD9D5","#01665e")) +
   ggtitle("Which best captures your beliefs \nabout the cause(s) of climate change?") +
-  guides(fill=guide_legend(title="Response"))
+  guides(fill=guide_legend(title="Response")) +
+  theme_bw()
   
 
   ccbeliefsstackedbarplot
@@ -498,9 +499,9 @@ CCConsensusTempDataBindNoDK <- CCConsensusTempDataBind %>%
 ccconsensustempresponses <- CCConsensusTempDataBindNoDK %>%
   select(Answer)
 
-CCConsensusTempDataBindNoDK$prepost <- plyr::mapvalues(CCConsensusTempDataBindNoDK$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCConsensusTempDataBindNoDK$prepost <- plyr::mapvalues(CCConsensusTempDataBindNoDK$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
-CCConsensusTempDataBindNoDK$prepost <- factor(CCConsensusTempDataBindNoDK$prepost, c("end","beginning"))
+CCConsensusTempDataBindNoDK$prepost <- factor(CCConsensusTempDataBindNoDK$prepost, c("End","Beginning"))
 
 # rename and order the responses
 
@@ -664,13 +665,13 @@ CCConsensusCauseDataBindAll <- CCConsensusCauseDataBind
 
 CCConsensusCauseDataBindAll$Answer <- plyr::mapvalues(CCConsensusCauseDataBindAll$Answer , from = c("Both", "Humans", "Natural", "Other", "DK","NotHappening"), to = c("Equally humans and natural","Mostly humans", "Mostly natural", "Other", "I don't know", "Climate change is not happening"))
 
-CCConsensusCauseDataBindAll$prepost <- plyr::mapvalues(CCConsensusCauseDataBindAll$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCConsensusCauseDataBindAll$prepost <- plyr::mapvalues(CCConsensusCauseDataBindAll$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
 CCconsensuscausesummaryall <- CCConsensusCauseDataBindAll %>%
   filter(Answer != "") %>%
   group_by(prepost,Answer) %>%
   summarise(n=n()) %>%
-  mutate(rel.freq = round(100 * n/sum(n), 0))
+  mutate(rel.freq = round(100 * n/sum(n), digits=1))
 
 CCconsensuscausesummaryall
 
@@ -688,15 +689,16 @@ CCconsensuscausesummaryall$Answer <- factor(CCconsensuscausesummaryall$Answer,
 ccconsensuscausestackedbarplot <- ggplot(CCconsensuscausesummaryall, aes(y=rel.freq, x=prepost)) + 
     geom_col(aes(fill=Answer)) +
   ylab("Percent of responses") +
-  xlab("Time of survey") +
+  xlab("Time of semester") +
   scale_fill_manual(values=c("gray","#8c510a","#d8b365","#f6e8c3","#ABD9D5","#01665e")) +
-  ggtitle("What is the scientific consensus regarding the cause(s) of climate change?")
+  ggtitle("What is the scientific consensus regarding \nthe cause(s) of climate change?") +
+  guides(fill=guide_legend(title="Response")) +
+  theme_bw()
   
 
 ccconsensuscausestackedbarplot
 
-save_plot("ccconsensuscausestackedbarplot.jpg", ccconsensuscausestackedbarplot, base_width = 10, base_height = 5)
-
+save_plot("ccconsensuscausestackedbarplot.jpg", ccconsensuscausestackedbarplot, base_width = 6.5, base_height = 5)
 ```
 
 ## Scientists have a good understanding of whether climate change is occurring
@@ -757,9 +759,9 @@ CCScientistsWhetherDataBindNoDK <- CCScientistsWhetherDataBind %>%
 ccscientistswhetherresponses <- CCScientistsWhetherDataBindNoDK %>%
   select(Answer)
 
-CCScientistsWhetherDataBindNoDK$prepost <- plyr::mapvalues(CCScientistsWhetherDataBindNoDK$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCScientistsWhetherDataBindNoDK$prepost <- plyr::mapvalues(CCScientistsWhetherDataBindNoDK$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
-CCScientistsWhetherDataBindNoDK$prepost <- factor(CCScientistsWhetherDataBindNoDK$prepost, c("end","beginning"))
+CCScientistsWhetherDataBindNoDK$prepost <- factor(CCScientistsWhetherDataBindNoDK$prepost, c("End","Beginning"))
 
 # rename and order the responses
 
@@ -871,9 +873,9 @@ CCScientistsWhyDataBindNoDK <- CCScientistsWhyDataBind %>%
 ccscientistswhyresponses <- CCScientistsWhyDataBindNoDK %>%
   select(Answer)
 
-CCScientistsWhyDataBindNoDK$prepost <- plyr::mapvalues(CCScientistsWhyDataBindNoDK$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCScientistsWhyDataBindNoDK$prepost <- plyr::mapvalues(CCScientistsWhyDataBindNoDK$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
-CCScientistsWhyDataBindNoDK$prepost <- factor(CCScientistsWhyDataBindNoDK$prepost, c("end","beginning"))
+CCScientistsWhyDataBindNoDK$prepost <- factor(CCScientistsWhyDataBindNoDK$prepost, c("End","Beginning"))
 
 # rename and order the responses
 
@@ -926,6 +928,13 @@ CCScientistsWhyDataBindDK <- CCScientistsWhyDataBind %>%
 
 3 students chose "don't know" on the pre-survey, none on the post-survey
 
+### Combined plot for whether & why data
+```{r, combined whether & why plot}
+combinedccwhetherwhyplot <- plot_grid(ccscientistswhetherlikertplot, ccscientistswhylikertplot, labels=c('A', 'B'), nrow=2, ncol=1)
+combinedccwhetherwhyplot
+
+save_plot("combinedccwhetherwhyplot.jpg", combinedccwhetherwhyplot, base_width = 10, base_height = 8)
+```
 
 ## Do students think they could easily change their views?
 CC_ChangeMind
@@ -2316,7 +2325,7 @@ CCConsensusCauseDataBindAllw18 <- CCConsensusCauseDataBindw18 %>%
 CCConsensusCauseDataBindAllw18$Answer <- plyr::mapvalues(CCConsensusCauseDataBindAllw18$Answer , from = c("Both", "Humans", "Natural", "Other", "DK","NoConsensus"), to = c("Equally humans and natural","Mostly humans", "Mostly natural", "Other", "I don't know", "There is no scientific consensus"))
 
 
-CCConsensusCauseDataBindAllw18$prepost <- plyr::mapvalues(CCConsensusCauseDataBindAllw18$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCConsensusCauseDataBindAllw18$prepost <- plyr::mapvalues(CCConsensusCauseDataBindAllw18$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
 CCconsensuscausesummaryallw18 <- CCConsensusCauseDataBindAllw18 %>%
   filter(Answer != "") %>%
@@ -2342,13 +2351,14 @@ ccconsensuscausestackedbarplotw18 <- ggplot(CCconsensuscausesummaryallw18, aes(y
   ylab("Percent of responses") +
   xlab("Time of survey") +
   scale_fill_manual(values=c("gray","#bf812d","#d8b365","#f6e8c3","#ABD9D5","#01665e")) +
-  ggtitle("What is the scientific consensus regarding the cause(s) of climate change?") +
+  ggtitle("What is the scientific consensus regarding \nthe cause(s) of climate change?") +
+  guides(fill=guide_legend(title="Response")) +
   theme_bw()
   
 
 ccconsensuscausestackedbarplotw18
 
-save_plot("ccconsensuscausestackedbarplotw18.jpg", ccconsensuscausestackedbarplotw18, base_width = 10, base_height = 5)
+save_plot("ccconsensuscausestackedbarplotw18.jpg", ccconsensuscausestackedbarplotw18, base_width = 6.5, base_height = 5)
 
 ```
 
@@ -2410,9 +2420,9 @@ CCScientistsWhetherDataBindNoDKw18 <- CCScientistsWhetherDataBindw18 %>%
 ccscientistswhetherresponsesw18 <- CCScientistsWhetherDataBindNoDKw18 %>%
   select(Answer)
 
-CCScientistsWhetherDataBindNoDKw18$prepost <- plyr::mapvalues(CCScientistsWhetherDataBindNoDKw18$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCScientistsWhetherDataBindNoDKw18$prepost <- plyr::mapvalues(CCScientistsWhetherDataBindNoDKw18$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
-CCScientistsWhetherDataBindNoDKw18$prepost <- factor(CCScientistsWhetherDataBindNoDKw18$prepost, c("end","beginning"))
+CCScientistsWhetherDataBindNoDKw18$prepost <- factor(CCScientistsWhetherDataBindNoDKw18$prepost, c("End","Beginning"))
 
 # rename and order the responses
 
@@ -2461,10 +2471,19 @@ save_plot("ccscientistswhetherlikertplotw18.jpg", ccscientistswhetherlikertplotw
 CCScientistsWhetherDataBindDKw18 <- CCScientistsWhetherDataBindw18 %>%
   filter(Answer == "DK")
 
+
+CCScientistsWhetherDataBindw18summary <- CCScientistsWhetherDataBindw18 %>%
+  group_by(prepost, Answer) %>%
+  summarise(n=n()) %>%
+  mutate(rel.freq = round(100 * n/sum(n), 0))
+
+CCScientistsWhetherDataBindw18summary
 ```
 
 
 3 students chose "don't know" for this question on the pre-survey, none on the post-survey
+
+
 
 ## Views on scientific consensus on why climate change is happening
 ```{r, analysis of scientists consensus on why for W18 data}
@@ -2523,9 +2542,9 @@ CCScientistsWhyDataBindNoDKw18 <- CCScientistsWhyDataBindw18 %>%
 ccscientistswhyresponsesw18 <- CCScientistsWhyDataBindNoDKw18 %>%
   select(Answer)
 
-CCScientistsWhyDataBindNoDKw18$prepost <- plyr::mapvalues(CCScientistsWhyDataBindNoDKw18$prepost , from = c("pre", "post"), to = c("beginning","end"))
+CCScientistsWhyDataBindNoDKw18$prepost <- plyr::mapvalues(CCScientistsWhyDataBindNoDKw18$prepost , from = c("pre", "post"), to = c("Beginning","End"))
 
-CCScientistsWhyDataBindNoDKw18$prepost <- factor(CCScientistsWhyDataBindNoDKw18$prepost, c("end","beginning"))
+CCScientistsWhyDataBindNoDKw18$prepost <- factor(CCScientistsWhyDataBindNoDKw18$prepost, c("End","Beginning"))
 
 # rename and order the responses
 
@@ -2573,7 +2592,22 @@ save_plot("ccscientistswhylikertplotw18.jpg", ccscientistswhylikertplotw18, base
 
 CCScientistsWhyDataBindDKw18 <- CCScientistsWhyDataBindw18 %>%
   filter(Answer == "DK")
+
+CCScientistsWhyDataBindw18summary <- CCScientistsWhyDataBindw18 %>%
+  group_by(prepost, Answer) %>%
+  summarise(n=n()) %>%
+  mutate(rel.freq = round(100 * n/sum(n), 0))
+
+CCScientistsWhyDataBindw18summary
 ```
+### Combined plot for whether & why W18 data
+```{r, combined whether & why plot for W18}
+combinedccwhetherwhyplotw18 <- plot_grid(ccscientistswhetherlikertplotw18, ccscientistswhylikertplotw18, labels=c('A', 'B'), nrow=2, ncol=1)
+combinedccwhetherwhyplotw18
+
+save_plot("combinedccwhetherwhyplotw18.jpg", combinedccwhetherwhyplotw18, base_width = 10, base_height = 8)
+```
+
 
 ## Do students feel that the course changed how they think about climate change?
 
