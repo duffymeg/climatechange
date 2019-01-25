@@ -23,7 +23,7 @@ library(BSDA)
 ```
 
 ```{r, load F2017 data}
-ccdata <- read.csv("ccsurvey_F17.csv")
+ccdata <- read.csv("ccsurvey_F17.csv", na.strings = "NA")
 colnames(ccdata)
 
 cctookboth <- subset(ccdata, took_pre_CC == 1 & took_post_CC == 1)
@@ -46,13 +46,6 @@ Options:
 - I don't know
 
 ```{r, summarize data}
-#preCCHappening <- aggregate(data.frame(count = cctookboth$CC_Happening_pre), list(value = cctookboth$CC_Happening_pre), length)
-
-#postCCHappening <- aggregate(data.frame(count = cctookboth$CC_Happening_post), list(value = cctookboth$CC_Happening_post), length)
-
-#preCCHappening$prepost <- rep("pre",nrow(preCCHappening))
-#postCCHappening$prepost <- rep("post",nrow(postCCHappening))
-
 CCHappeningPre <- cctookboth$CC_Happening_pre
 CCHappeningPre <- as.data.frame(CCHappeningPre)
 names(CCHappeningPre)[1] = c("Answer")
@@ -173,7 +166,7 @@ save_plot("cchappeninglikertplot.jpg", cchappeninglikertplot, base_width = 12, b
 ```
 
 ## Reaction norm plots
-```{r, did individual views on whether climate change is happening change during semester?}
+```{r, did individual views on whether climate change is happening change during semester}
 cchappeningwide <- dplyr::select(cctookboth, CC_Happening_pre, CC_Happening_post)
 
 cchappeningwide$ID <- seq.int(nrow(cchappeningwide))
@@ -223,66 +216,105 @@ SIGN.test(x = prehappening01, y = posthappening01, alternative = "two.sided",
           conf.level = 0.95)
 ```
 
-### Jitter plot heat map 
+### dot plot that shows paired responses
 ```{r, jitter plot heat map figure of cchappening data}
 cchappeningwide <- dplyr::select(cctookboth, CC_Happening_pre, CC_Happening_post)
 
 cchappeningwide <- cchappeningwide %>%
-  filter(CC_Happening_pre != "NA" & CC_Happening_post != "NA" )
+  subset(CC_Happening_pre != "NA" & CC_Happening_post != "" )
+
+cchappeningwide$CC_Happening_pre <- plyr::mapvalues(cchappeningwide$CC_Happening_pre, from = c("YesExtrSure",
+                                              "YesVerySure", 
+                                              "YesSomeSure",
+                                              "YesNotSure",
+                                              "DK",
+                                              "NoSomeSure"), 
+                                              to = c("Yes, extremely sure",
+                                                     "Yes, very sure",
+                                                     "Yes, somewhat sure",
+                                                     "Yes, but not sure",
+                                                     "I don't know",
+                                                     "No, somewhat sure"))
+
+cchappeningwide$CC_Happening_post <- plyr::mapvalues(cchappeningwide$CC_Happening_post, from = c("YesExtrSure",
+                                              "YesVerySure", 
+                                              "YesSomeSure",
+                                              "YesNotSure",
+                                              "DK",
+                                              "NoSomeSure"), 
+                                              to = c("Yes, extremely sure",
+                                                     "Yes, very sure",
+                                                     "Yes, somewhat sure",
+                                                     "Yes, but not sure",
+                                                     "I don't know",
+                                                     "No, somewhat sure"))
 
 cchappeningwide$CC_Happening_pre <- factor(cchappeningwide$CC_Happening_pre, 
-                                 c("NoExtrSure", "NoVerySure","NoSomeSure","NoNotSure","DK","YesNotSure","YesSomeSure","YesVerySure","YesExtrSure"))
+                                 c("No, somewhat sure",
+                                  "I don't know",
+                                  "Yes, but not sure",
+                                  "Yes, somewhat sure",
+                                  "Yes, very sure",
+                                  "Yes, extremely sure"))
 
 cchappeningwide$CC_Happening_post <- factor(cchappeningwide$CC_Happening_post, 
-                                 c("NoExtrSure", "NoVerySure","NoSomeSure","NoNotSure","DK","YesNotSure","YesSomeSure","YesVerySure","YesExtrSure"))
+                                 c("No, somewhat sure",
+                                  "I don't know",
+                                  "Yes, but not sure",
+                                  "Yes, somewhat sure",
+                                  "Yes, very sure",
+                                  "Yes, extremely sure"))
+
 
 correlationplot <- ggplot(cchappeningwide, aes(x=CC_Happening_pre, y=CC_Happening_post)) +
-  geom_jitter(w=0.02, h=0.02,alpha=0.3)
+  geom_jitter(alpha=0.3) +
+  ggtitle("Paired responses (each point is a single student)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Response at beginning of semester") +
+  ylab("Response at end of semester") +
+  theme_bw()
 
 correlationplot
 
+save_plot("correlationplot.jpg", correlationplot, base_width = 8, base_height = 6)
 ```
 
-### trying a regular heat map
-```{r, did individual views on whether climate change is happening change during semester?}
-cchappeningwide <- dplyr::select(cctookboth, CC_Happening_pre, CC_Happening_post)
+### trying a heat map
+```{r, did individual views on whether climate change is happening change during semester}
+library(lattice)
+cchappeningwide <- cctookboth %>%
+  subset(CC_Happening_pre != "" & CC_Happening_post != "") %>%
+  select(CC_Happening_pre, CC_Happening_post)
 
-cchappeningwide$ID <- seq.int(nrow(cchappeningwide))
+# Set response options
+options <- c("NoExtrSure", "NoVerySure","NoSomeSure","NoNotSure","DK","YesNotSure","YesSomeSure","YesVerySure","YesExtrSure")
+n_options <- length(options)
 
-cchappeninglong <- cchappeningwide %>%
-  filter(CC_Happening_pre != "NA" & CC_Happening_post != "NA" ) %>%
-  gather(PrevPost,CCHappening,CC_Happening_pre:CC_Happening_post)
+# Create new dataframe to plot CC_Happening data as heatmap
+df_cc_happening <- matrix(nrow=n_options, ncol=n_options)
+for (i in 1:nrow(df_cc_happening)) {
+  for (j in 1:ncol(df_cc_happening)) {
+    df_cc_happening[i,j] <- sum(cchappeningwide$CC_Happening_pre == options[i] & cchappeningwide$CC_Happening_post == options[j])
+  }
+}
 
-cchappeninglong$CCHappening01 <-  plyr::mapvalues(cchappeninglong$CCHappening, from = c("NoExtrSure", "NoVerySure","NoSomeSure","NoNotSure","DK","YesNotSure","YesSomeSure","YesVerySure","YesExtrSure"), to = c(1,2,3,4,5,6,7,8,9))
+# Plot heatmap for CC_Happening Question
+xylabels <- c("No\nExtr\nSure", "No\nVery\nSure","No\nSome\nSure","No\nNot\nSure","DK","Yes\nNot\nSure","Yes\nSome\nSure","Yes\nVery\nSure","Yes\nExtr\nSure")
 
-cchappeninglong$CCHappening01 <- as.numeric(as.character(cchappeninglong$CCHappening01))
+heatmapplot <- levelplot(df_cc_happening, at=seq(0,max(df_cc_happening),1), 
+		  col.regions=colorRampPalette(c("white","blue")),
+		  xlab="Beginning of Semester Response", ylab="End of Semester Response",
+		  scales=(list(labels=xylabels, at = seq(1,9,1))),
+		  main = "Is climate change happening?"
+		  )
 
-cchappeninglong$PrevPost <- plyr::mapvalues(cchappeninglong$PrevPost, from = c("CC_Happening_pre","CC_Happening_post"), to = c("Pre", "Post"))
+heatmapplot
 
-cchappeninglong$PrevPost <- factor(cchappeninglong$PrevPost, levels=c("Pre", "Post"))
-
-cchappeninglong2 <- subset(cchappeninglong, select = -c(CCHappening)) %>%
-  filter(CCHappening01 != "") %>%
-  filter(CCHappening01 != "NA")
-
-cchappeningwide2 <- cchappeninglong2 %>%
-  spread(PrevPost, CCHappening01) 
-
-cchappeningjointresponse <- cchappeningwide2 %>%
-  unite_("pre_post", c("Pre","Post"))
-
-cchappeningjointresponsesummary <- cchappeningjointresponse %>%
-  group_by(pre_post) %>%
-  summarise(n=n()) %>%
-  mutate(rel.freq = round(100 * n/sum(n), 0))
-
-cchappeningjointresponsesummary
-
-##GAVE UP HERE!
+trellis.device(device="jpeg", file="heatmapplot.jpeg")
+print(heatmapplot)
+dev.off()
   
 ```
-
-
 
 ### Making a figure for the manuscript
 ```{r, combined figure showing student views on climate change}
@@ -292,15 +324,17 @@ combinedcchappeningplot
 save_plot("combinedcchappeningplot.jpg", combinedcchappeningplot, base_width = 10, base_height = 6)
 ```
 
+
+### Making a second figure for the manuscript
+```{r, combined figure showing student views on climate change this time using the dot plot instead of the line plot}
+combinedcchappeningplotv2 <- plot_grid(cchappeninglikertplot, correlationplot, labels=c('A', 'B'), nrow=2, ncol=1)
+combinedcchappeningplot
+
+save_plot("combinedcchappeningplotv2.jpg", combinedcchappeningplotv2, base_width = 10, base_height = 6)
+```
+
 ## Who do students think is causing climate change?
 ```{r, beliefs about cause}
-preCCBeliefs <- aggregate(data.frame(count = cctookboth$CC_Beliefs_pre), list(value = cctookboth$CC_Beliefs_pre), length)
-
-postCCBeliefs <- aggregate(data.frame(count = cctookboth$CC_Beliefs_post), list(value = cctookboth$CC_Beliefs_post), length)
-
-preCCBeliefs$prepost <- rep("pre",nrow(preCCBeliefs))
-postCCBeliefs$prepost <- rep("post",nrow(postCCBeliefs))
-
 CCBeliefsPre <- cctookboth$CC_Beliefs_pre
 CCBeliefsPre <- as.data.frame(CCBeliefsPre)
 names(CCBeliefsPre)[1] = c("Answer")
@@ -403,6 +437,13 @@ CCbeliefssummaryall <- CCBeliefsDataBindAll %>%
 
 CCbeliefssummaryall
 
+samplesizes <- CCBeliefsDataBindAll %>%
+  filter(Answer != "") %>%
+  group_by(prepost) %>%
+  summarise(n=n()) 
+
+samplesizes
+
 
 # order the responses
 CCbeliefssummaryall$Answer <- factor(CCbeliefssummaryall$Answer, 
@@ -424,7 +465,10 @@ ccbeliefsstackedbarplot <- ggplot(CCbeliefssummaryall, aes(y=rel.freq, x=prepost
   scale_fill_manual(values=c("gray","#8c510a","#d8b365","#f6e8c3","#ABD9D5","#01665e")) +
   ggtitle("Which best captures your beliefs \nabout the cause(s) of climate change?") +
   guides(fill=guide_legend(title="Response")) +
-  theme_bw()
+  ylim(0,105) +
+  annotate("text", x = 1, y = 105, label = paste("n = 120")) +
+  annotate("text", x = 2, y = 105, label = paste("n = 119")) +
+  theme_bw() 
   
 
   ccbeliefsstackedbarplot
@@ -432,7 +476,16 @@ ccbeliefsstackedbarplot <- ggplot(CCbeliefssummaryall, aes(y=rel.freq, x=prepost
 save_plot("ccbeliefsstackedbarplot.jpg", ccbeliefsstackedbarplot, base_width = 6.5, base_height = 5)
 
 ```
-Summary: the number of students who agreed with the statement "Scientists have a good understanding of whether climate change is occurring" increased from 93% to 98% over the course of the semester. Most notably, the number of students who strongly agreed with that statement increased from 56% to 89%. 
+
+```{r, test for significant shift in beliefs}
+
+
+mostlyhumans <- prop.test(x = c(83, 109), n = c(120, 119))
+mostlyhumans 
+
+equally <- prop.test(x = c(26, 6), n = c(120, 119))
+equally
+```
 
 ## What are student views on whether there's a consensus that temperatures have increased in the past century?
 
@@ -446,13 +499,6 @@ o Strongly disagree
 o I don’t know
 
 ```{r, analysis of scientific consensus on temp change}
-preCC_ConsensusTemp <- aggregate(data.frame(count = cctookboth$CC_ConsensusTemp_pre), list(value = cctookboth$CC_ConsensusTemp_pre), length)
-
-postCCConsensusTemp <- aggregate(data.frame(count = cctookboth$CC_ConsensusTemp_post), list(value = cctookboth$CC_ConsensusTemp_post), length)
-
-preCC_ConsensusTemp$prepost <- rep("pre",nrow(preCC_ConsensusTemp))
-postCCConsensusTemp$prepost <- rep("post",nrow(postCCConsensusTemp))
-
 CCConsensusTempPre <- cctookboth$CC_ConsensusTemp_pre
 CCConsensusTempPre <- as.data.frame(CCConsensusTempPre)
 names(CCConsensusTempPre)[1] = c("Answer")
@@ -539,7 +585,9 @@ likert_ccconsensustemp <- likert(ccconsensustempresponses, grouping = ccconsensu
 ccconsensustemplikertplot = plot(likert_ccconsensustemp,legend.position="bottom",text.size=4) + 
   scale_y_continuous(limits=c(-100,150)) +
   coord_flip(ylim=c(-110,110)) +
-  theme(strip.text = element_text(margin=margin(4, 0, 4, 0),size=20))
+  theme(strip.text = element_text(margin=margin(4, 0, 4, 0),size=20)) +
+  annotate("text", x = 2, y = -50, label = paste("n = 116")) +
+  annotate("text", x = 1, y = -50, label = paste("n = 120"))
 
 ccconsensustemplikertplot <- ggplot_gtable(ggplot_build(ccconsensustemplikertplot))
 ccconsensustemplikertplot$layout$clip <- "off"
@@ -558,7 +606,14 @@ CCconsensustempsummary <- CCConsensusTempDataBind %>%
   summarise(n=n()) %>%
   mutate(rel.freq = round(100 * n/sum(n), 0))
 
+CCconsensustempsummary
 
+samplesizes <- CCConsensusTempDataBind %>%
+  filter(Answer != "") %>%
+  group_by(prepost) %>%
+  summarise(n=n()) 
+
+samplesizes
 ```
 
 ## The scientific consensus is that climate change is caused mostly by humans activities. Do students agree?
@@ -574,13 +629,6 @@ o I don’t know what the scientific consensus is
 o There is no scientific consensus
 
 ```{r, beliefs about cause}
-preCCConsensusCause <- aggregate(data.frame(count = cctookboth$CC_ConsensusCause_pre), list(value = cctookboth$CC_ConsensusCause_pre), length)
-
-postCCConsensusCause <- aggregate(data.frame(count = cctookboth$CC_ConsensusCause_post), list(value = cctookboth$CC_ConsensusCause_post), length)
-
-preCCConsensusCause$prepost <- rep("pre",nrow(preCCConsensusCause))
-postCCConsensusCause$prepost <- rep("post",nrow(postCCConsensusCause))
-
 CCConsensusCausePre <- cctookboth$CC_ConsensusCause_pre
 CCConsensusCausePre <- as.data.frame(CCConsensusCausePre)
 names(CCConsensusCausePre)[1] = c("Answer")
@@ -708,13 +756,6 @@ save_plot("ccconsensuscausestackedbarplot.jpg", ccconsensuscausestackedbarplot, 
 
 ### Views on scientific consensus about whether climate change is happening
 ```{r, analysis of scientists consensus on whether}
-preCCScientistsWhether <- aggregate(data.frame(count = cctookboth$CC_ScientistsWhether_pre), list(value = cctookboth$CC_ScientistsWhether_pre), length)
-
-postCCScientistsWhether <- aggregate(data.frame(count = cctookboth$CC_ScientistsWhether_post), list(value = cctookboth$CC_ScientistsWhether_post), length)
-
-preCCScientistsWhether$prepost <- rep("pre",nrow(preCCScientistsWhether))
-postCCScientistsWhether$prepost <- rep("post",nrow(postCCScientistsWhether))
-
 CCScientistsWhetherPre <- cctookboth$CC_ScientistsWhether_pre
 CCScientistsWhetherPre <- as.data.frame(CCScientistsWhetherPre)
 names(CCScientistsWhetherPre)[1] = c("Answer")
@@ -820,13 +861,6 @@ CCScientistsWhetherDataBindDK <- CCScientistsWhetherDataBind %>%
 
 ## Views on scientific consensus on why climate change is happening
 ```{r, analysis of scientists consensus on why}
-preCCScientistsWhy <- aggregate(data.frame(count = cctookboth$CC_ScientistsWhy_pre), list(value = cctookboth$CC_ScientistsWhy_pre), length)
-
-postCCScientistsWhy <- aggregate(data.frame(count = cctookboth$CC_ScientistsWhy_post), list(value = cctookboth$CC_ScientistsWhy_post), length)
-
-preCCScientistsWhy$prepost <- rep("pre",nrow(preCCScientistsWhy))
-postCCScientistsWhy$prepost <- rep("post",nrow(postCCScientistsWhy))
-
 CCScientistsWhyPre <- cctookboth$CC_ScientistsWhy_pre
 CCScientistsWhyPre <- as.data.frame(CCScientistsWhyPre)
 names(CCScientistsWhyPre)[1] = c("Answer")
@@ -950,13 +984,6 @@ o Somewhat disagree
 o Strongly disagree
 
 ```{r, initial plotting of whether students think they can easily change their views}
-preCCChangeMind <- aggregate(data.frame(count = cctookboth$CC_ChangeMind_pre), list(value = cctookboth$CC_ChangeMind_pre), length)
-
-postCCChangeMind <- aggregate(data.frame(count = cctookboth$CC_ChangeMind_post), list(value = cctookboth$CC_ChangeMind_post), length)
-
-preCCChangeMind$prepost <- rep("pre",nrow(preCCChangeMind))
-postCCChangeMind$prepost <- rep("post",nrow(postCCChangeMind))
-
 CCChangeMindPre <- cctookboth$CC_ChangeMind_pre
 CCChangeMindPre <- as.data.frame(CCChangeMindPre)
 names(CCChangeMindPre)[1] = c("Answer")
@@ -1098,10 +1125,6 @@ save_plot("ccchangemindrxnplot.jpg", ccchangemindrxnplot, base_width = 6, base_h
 ## Do students feel that the course changed how they think about climate change?
 
 ```{r, course changed views}
-postCCChangedMe <- aggregate(data.frame(count = cctookboth$CC_ChangedMe_post), list(value = cctookboth$CC_ChangedMe_post), length)
-
-postCCChangedMe$prepost <- rep("post",nrow(postCCChangedMe))
-
 CCChangedMePost <- cctookboth$CC_ChangedMe_post
 CCChangedMePost <- as.data.frame(CCChangedMePost)
 names(CCChangedMePost)[1] = c("Answer")
@@ -1308,13 +1331,6 @@ o All
 o I don’t know
 
 ```{r, initial plotting of data on friend views}
-preCCFriends <- aggregate(data.frame(count = cctookboth$CC_Friends_pre), list(value = cctookboth$CC_Friends_pre), length)
-
-postCCFriends <- aggregate(data.frame(count = cctookboth$CC_Friends_post), list(value = cctookboth$CC_Friends_post), length)
-
-preCCFriends$prepost <- rep("pre",nrow(preCCFriends))
-postCCFriends$prepost <- rep("post",nrow(postCCFriends))
-
 CCFriendsPre <- cctookboth$CC_Friends_pre
 CCFriendsPre <- as.data.frame(CCFriendsPre)
 names(CCFriendsPre)[1] = c("Answer")
@@ -1506,13 +1522,6 @@ save_plot("ccworriedlikertplot.jpg", ccworriedlikertplot, base_width = 12, base_
 
 ## When do students think climate change will start to harm people?
 ```{r, when will cc start to harm people}
-preCCHarmPeople <- aggregate(data.frame(count = cctookboth$CC_HarmPeople_pre), list(value = cctookboth$CC_HarmPeople_pre), length)
-
-postCCHarmPeople <- aggregate(data.frame(count = cctookboth$CC_HarmPeople_post), list(value = cctookboth$CC_HarmPeople_post), length)
-
-preCCHarmPeople$prepost <- rep("pre",nrow(preCCHarmPeople))
-postCCHarmPeople$prepost <- rep("post",nrow(postCCHarmPeople))
-
 CCHarmPeoplePre <- cctookboth$CC_HarmPeople_pre
 CCHarmPeoplePre <- as.data.frame(CCHarmPeoplePre)
 names(CCHarmPeoplePre)[1] = c("Answer")
@@ -1609,13 +1618,6 @@ The codes for those in the data are:
 - DK
 
 ```{r, how much will cc harm them}
-preCCHarmYou <- aggregate(data.frame(count = cctookboth$CC_HarmYou_pre), list(value = cctookboth$CC_HarmYou_pre), length)
-
-postCCHarmYou <- aggregate(data.frame(count = cctookboth$CC_HarmYou_post), list(value = cctookboth$CC_HarmYou_post), length)
-
-preCCHarmYou$prepost <- rep("pre",nrow(preCCHarmYou))
-postCCHarmYou$prepost <- rep("post",nrow(postCCHarmYou))
-
 CCHarmYouPre <- cctookboth$CC_HarmYou_pre
 CCHarmYouPre <- as.data.frame(CCHarmYouPre)
 names(CCHarmYouPre)[1] = c("Answer")
@@ -1722,13 +1724,6 @@ ccharmyousummary <-
 
 ## How important is the issue of climate change to you personally?
 ```{r, how personally important}
-preCCImportant <- aggregate(data.frame(count = cctookboth$CC_Important_pre), list(value = cctookboth$CC_Important_pre), length)
-
-postCCImportant <- aggregate(data.frame(count = cctookboth$CC_Important_post), list(value = cctookboth$CC_Important_post), length)
-
-preCCImportant$prepost <- rep("pre",nrow(preCCImportant))
-postCCImportant$prepost <- rep("post",nrow(postCCImportant))
-
 CCImportantPre <- cctookboth$CC_Important_pre
 CCImportantPre <- as.data.frame(CCImportantPre)
 names(CCImportantPre)[1] = c("Answer")
@@ -1844,13 +1839,6 @@ The codes for those in the data are:
 Note: I was initially confused about what was going on with the "can't reduce" option, since it appeared as a level in R but wasn't appearing on the figure. Looking into it more, some students chose that option, but the only students who chose it were students who answered the validation question incorrectly at the beginning and/or end of the semester. So, it doesn't appear on the figure because those students are filtered out.
 
 ```{r, views on CC}
-preCCView <- aggregate(data.frame(count = cctookboth$CC_View_pre), list(value = cctookboth$CC_View_pre), length)
-
-postCCView <- aggregate(data.frame(count = cctookboth$CC_View_post), list(value = cctookboth$CC_View_post), length)
-
-preCCView$prepost <- rep("pre",nrow(preCCView))
-postCCView$prepost <- rep("post",nrow(postCCView))
-
 CCViewPre <- cctookboth$CC_View_pre
 CCViewPre <- as.data.frame(CCViewPre)
 names(CCViewPre)[1] = c("Answer")
@@ -1960,14 +1948,7 @@ Options:
 - I don't know
 
 ```{r, summarize data}
-preCCHappeningw18 <- aggregate(data.frame(count = cctookbothw18$CCPre_Happening_pre), list(value = cctookbothw18$CCPre_Happening_pre), length)
-
-postCCHappeningw18 <- aggregate(data.frame(count = cctookbothw18$CCPost_Happening_post), list(value = cctookbothw18$CCPost_Happening_post), length)
-
-preCCHappeningw18$prepost <- rep("pre",nrow(preCCHappeningw18))
-postCCHappeningw18$prepost <- rep("post",nrow(postCCHappeningw18))
-
-CCHappeningPrew18 <- cctookbothw18$CCPre_Happening_pre
+CHappeningPrew18 <- cctookbothw18$CCPre_Happening_pre
 CCHappeningPrew18 <- as.data.frame(CCHappeningPrew18)
 names(CCHappeningPrew18)[1] = c("Answer")
 
@@ -2140,13 +2121,6 @@ My guesses for Kyle's codes:
 ● Other == "Other"
 
 ```{r, beliefs about cause for W18 data}
-preCCBeliefsw18 <- aggregate(data.frame(count = cctookbothw18$CCPre_Causes_pre), list(value = cctookbothw18$CCPre_Causes_pre), length)
-
-postCCBeliefsw18 <- aggregate(data.frame(count = cctookbothw18$CCPost_Causes_post), list(value = cctookbothw18$CCPost_Causes_post), length)
-
-preCCBeliefsw18$prepost <- rep("pre",nrow(preCCBeliefsw18))
-postCCBeliefsw18$prepost <- rep("post",nrow(postCCBeliefsw18))
-
 CCBeliefsPrew18 <- cctookbothw18$CCPre_Causes_pre
 CCBeliefsPrew18 <- as.data.frame(CCBeliefsPrew18)
 names(CCBeliefsPrew18)[1] = c("Answer")
@@ -2238,13 +2212,6 @@ o I don’t know what the scientific consensus is
 o There is no scientific consensus
 
 ```{r, beliefs about cause w18}
-preCCConsensusCausew18 <- aggregate(data.frame(count = cctookbothw18$CCPre_ConsensusCause_pre), list(value = cctookbothw18$CCPre_ConsensusCause_pre), length)
-
-postCCConsensusCausew18 <- aggregate(data.frame(count = cctookbothw18$CCPost_ConsensusCause_post), list(value = cctookbothw18$CCPost_ConsensusCause_post), length)
-
-preCCConsensusCausew18$prepost <- rep("pre",nrow(preCCConsensusCausew18))
-postCCConsensusCausew18$prepost <- rep("post",nrow(postCCConsensusCausew18))
-
 CCConsensusCausePrew18 <- cctookbothw18$CCPre_ConsensusCause_pre
 CCConsensusCausePrew18 <- as.data.frame(CCConsensusCausePrew18)
 names(CCConsensusCausePrew18)[1] = c("Answer")
@@ -2374,13 +2341,6 @@ save_plot("ccconsensuscausestackedbarplotw18.jpg", ccconsensuscausestackedbarplo
 ## Scientists have a good understanding of whether climate change is occurring
 ### Views on scientific consensus about whether climate change is happening
 ```{r, analysis of scientists consensus on whether}
-preCCScientistsWhetherw18 <- aggregate(data.frame(count = cctookbothw18$CCPre_ScientistsWhether_pre), list(value = cctookbothw18$CCPre_ScientistsWhether_pre), length)
-
-postCCScientistsWhetherw18 <- aggregate(data.frame(count = cctookbothw18$CCPost_ScientistsWhether_post), list(value = cctookbothw18$CCPost_ScientistsWhether_post), length)
-
-preCCScientistsWhetherw18$prepost <- rep("pre",nrow(preCCScientistsWhetherw18))
-postCCScientistsWhetherw18$prepost <- rep("post",nrow(postCCScientistsWhetherw18))
-
 CCScientistsWhetherPrew18 <- cctookbothw18$CCPre_ScientistsWhether_pre
 CCScientistsWhetherPrew18 <- as.data.frame(CCScientistsWhetherPrew18)
 names(CCScientistsWhetherPrew18)[1] = c("Answer")
@@ -2496,13 +2456,6 @@ CCScientistsWhetherDataBindw18summary
 
 ## Views on scientific consensus on why climate change is happening
 ```{r, analysis of scientists consensus on why for W18 data}
-preCCScientistsWhyw18 <- aggregate(data.frame(count = cctookbothw18$CCPre_ScientistsWhy_pre), list(value = cctookbothw18$CCPre_ScientistsWhy_pre), length)
-
-postCCScientistsWhyw18 <- aggregate(data.frame(count = cctookbothw18$CCPost_ScientistsWhy_post), list(value = cctookbothw18$CCPost_ScientistsWhy_post), length)
-
-preCCScientistsWhyw18$prepost <- rep("pre",nrow(preCCScientistsWhyw18))
-postCCScientistsWhyw18$prepost <- rep("post",nrow(postCCScientistsWhyw18))
-
 CCScientistsWhyPrew18 <- cctookbothw18$CCPre_ScientistsWhy_pre
 CCScientistsWhyPrew18 <- as.data.frame(CCScientistsWhyPrew18)
 names(CCScientistsWhyPrew18)[1] = c("Answer")
@@ -2692,13 +2645,6 @@ save_plot("ccchangedmelikertplotw18.jpg", ccchangedmelikertplotw18, base_width =
 
 NOTE: I'm realizing now that it's a little weird that we asked this on the pre- and post- surveys, except it's also kind of interesting that we did!
 ```{r, how much thought}
-preCCThoughtw18 <- aggregate(data.frame(count = cctookbothw18$CCPre_Thought_pre), list(value = cctookbothw18$CCPre_Thought_pre), length)
-
-postCCThoughtw18 <- aggregate(data.frame(count = cctookbothw18$CCPost_Thought_post), list(value = cctookbothw18$CCPost_Thought_post), length)
-
-preCCThoughtw18$prepost <- rep("pre",nrow(preCCThoughtw18))
-postCCThoughtw18$prepost <- rep("post",nrow(postCCThoughtw18))
-
 CCThoughtPrew18 <- cctookbothw18$CCPre_Thought_pre
 CCThoughtPrew18 <- as.data.frame(CCThoughtPrew18)
 names(CCThoughtPrew18)[1] = c("Answer")
@@ -2791,13 +2737,6 @@ save_plot("ccthoughtlikertplotw18.jpg", ccthoughtlikertplotw18, base_width = 12,
 
 ## How worried are students about climate change?
 ```{r, analysis of amount of worry W18}
-preCCWorriedw18 <- aggregate(data.frame(count = cctookbothw18$CCPre_Worried_pre), list(value = cctookbothw18$CCPre_Worried_pre), length)
-
-postCCWorriedw18 <- aggregate(data.frame(count = cctookbothw18$CCPost_Worried_post), list(value = cctookbothw18$CCPost_Worried_post), length)
-
-preCCWorriedw18$prepost <- rep("pre",nrow(preCCWorriedw18))
-postCCWorriedw18$prepost <- rep("post",nrow(postCCWorriedw18))
-
 CCWorriedPrew18 <- cctookbothw18$CCPre_Worried_pre
 CCWorriedPrew18 <- as.data.frame(CCWorriedPrew18)
 names(CCWorriedPrew18)[1] = c("Answer")
@@ -2920,13 +2859,6 @@ Options:
 - I don't know
 
 ```{r, summarize combined data}
-preCCHappeningcombined <- aggregate(data.frame(count = cctookbothcombined$CC_Happening_pre), list(value = cctookbothcombined$CC_Happening_pre), length)
-
-postCCHappeningcombined <- aggregate(data.frame(count = cctookbothcombined$CC_Happening_post), list(value = cctookbothcombined$CC_Happening_post), length)
-
-preCCHappeningcombined$prepost <- rep("pre",nrow(preCCHappeningcombined))
-postCCHappeningcombined$prepost <- rep("post",nrow(postCCHappeningcombined))
-
 CCHappeningPrecombined <- cctookbothcombined$CC_Happening_pre
 CCHappeningPrecombined <- as.data.frame(CCHappeningPrecombined)
 names(CCHappeningPrecombined)[1] = c("Answer")
@@ -3044,6 +2976,11 @@ CChappeningsummarycombined
 
 ```
 
+```{r, significant shift in happening with combined data}
+extrhappening <- prop.test(x = c(164, 266), n = c(372, 372))
+extrhappening 
+```
+
 ## Reaction norm plots
 ```{r, did individual views on whether climate change is happening change during semester?}
 cchappeningwidecombined <- dplyr::select(cctookbothcombined, CC_Happening_pre, CC_Happening_post)
@@ -3078,6 +3015,88 @@ save_plot("cchappeningrxnplotcombined.jpg", cchappeningrxnplotcombined, base_wid
 ```
 
 
+### dot plot that shows paired responses
+```{r, dot plot of combined cchappening data}
+cchappeningwidecombined <- dplyr::select(cctookbothcombined, CC_Happening_pre, CC_Happening_post)
+
+cchappeningwidecombined <- cchappeningwidecombined %>%
+  subset(CC_Happening_pre != "" & CC_Happening_post != "" ) 
+
+str(cchappeningwidecombined)
+
+# Was having a problem with one of the NAs not going away. Troubleshooting here to find it:
+findingnas <- is.na(cchappeningwidecombined$CC_Happening_pre)
+findingnas <- data.frame(findingnas)
+
+# Now removing that row manually. Not elegant, but effective
+cchappeningwidecombined = cchappeningwidecombined[-343,]
+
+cchappeningwidecombined$CC_Happening_pre <- plyr::mapvalues(cchappeningwidecombined$CC_Happening_pre, from = c("YesExtrSure",
+                                              "YesVerySure", 
+                                              "YesSomeSure",
+                                              "YesNotSure",
+                                              "DK",
+                                              "NoSomeSure"), 
+                                              to = c("Yes, extremely sure",
+                                                     "Yes, very sure",
+                                                     "Yes, somewhat sure",
+                                                     "Yes, but not sure",
+                                                     "I don't know",
+                                                     "No, somewhat sure"))
+
+cchappeningwidecombined$CC_Happening_post <- plyr::mapvalues(cchappeningwidecombined$CC_Happening_post, from = c("YesExtrSure",
+                                              "YesVerySure", 
+                                              "YesSomeSure",
+                                              "YesNotSure",
+                                              "DK",
+                                              "NoSomeSure"), 
+                                              to = c("Yes, extremely sure",
+                                                     "Yes, very sure",
+                                                     "Yes, somewhat sure",
+                                                     "Yes, but not sure",
+                                                     "I don't know",
+                                                     "No, somewhat sure"))
+
+cchappeningwidecombined$CC_Happening_pre <- factor(cchappeningwidecombined$CC_Happening_pre, 
+                                 c("No, somewhat sure",
+                                  "I don't know",
+                                  "Yes, but not sure",
+                                  "Yes, somewhat sure",
+                                  "Yes, very sure",
+                                  "Yes, extremely sure"))
+
+cchappeningwidecombined$CC_Happening_post <- factor(cchappeningwidecombined$CC_Happening_post, 
+                                 c("No, somewhat sure",
+                                  "I don't know",
+                                  "Yes, but not sure",
+                                  "Yes, somewhat sure",
+                                  "Yes, very sure",
+                                  "Yes, extremely sure"))
+
+ntoplot <- length(cchappeningwidecombined$CC_Happening_pre)
+
+correlationplotcombined <- ggplot(cchappeningwidecombined, aes(x=CC_Happening_pre, y=CC_Happening_post)) +
+  geom_jitter(width=0.25, height=0.25, alpha=0.3) +
+  ggtitle("Paired responses (each point is a single student)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Response at beginning of semester") +
+  ylab("Response at end of semester") +
+  theme_bw() +
+  annotate("text", x = 6, y = 1, label = paste("n = 371"))
+
+correlationplotcombined
+
+save_plot("correlationplotcombined.jpg", correlationplotcombined, base_width = 8, base_height = 6)
+```
+
+### Making a second figure for the manuscript
+```{r, combined figure showing student views on climate change this time using the dot plot instead of the line plot}
+combinedcchappeningplotcombinedv2 <- plot_grid(cchappeninglikertplotcombined, correlationplotcombined, labels=c('A', 'B'), nrow=2, ncol=1)
+combinedcchappeningplotcombinedv2
+
+save_plot("combinedcchappeningplotcombinedv2.jpg", combinedcchappeningplotcombinedv2, base_width = 10, base_height = 8)
+```
+
 ## The scientific consensus is that climate change is caused mostly by humans activities. Do students agree?
 
 CC_ConsensusCause
@@ -3091,13 +3110,6 @@ o I don’t know what the scientific consensus is
 o There is no scientific consensus
 
 ```{r, beliefs about cause using combined data}
-preCCConsensusCausecombined <- aggregate(data.frame(count = cctookbothcombined$CC_ConsensusCause_pre), list(value = cctookbothcombined$CC_ConsensusCause_pre), length)
-
-postCCConsensusCausecombined <- aggregate(data.frame(count = cctookbothcombined$CC_ConsensusCause_post), list(value = cctookbothcombined$CC_ConsensusCause_post), length)
-
-preCCConsensusCausecombined$prepost <- rep("pre",nrow(preCCConsensusCausecombined))
-postCCConsensusCausecombined$prepost <- rep("post",nrow(postCCConsensusCausecombined))
-
 CCConsensusCausePrecombined <- cctookbothcombined$CC_ConsensusCause_pre
 CCConsensusCausePrecombined <- as.data.frame(CCConsensusCausePrecombined)
 names(CCConsensusCausePrecombined)[1] = c("Answer")
@@ -3137,8 +3149,20 @@ CCconsensuscausesummarycombined <- CCConsensusCauseDataBindcombined %>%
 
 CCconsensuscausesummarycombined
 
-```
+samplesizes <- CCConsensusCauseDataBindcombined %>%
+  filter(Answer != "") %>%
+  group_by(prepost) %>%
+  summarise(n=n())
 
+samplesizes
+```
+```{r, test for significant shift in beliefs}
+mostlyhumans <- prop.test(x = c(230, 299), n = c(372, 383))
+mostlyhumans 
+
+equally <- prop.test(x = c(70, 45), n = c(372, 383))
+equally
+```
 
 ```{r, trying a stacked bar chart for consensus cause data for combined data}
 CCConsensusCauseDataBindAllcombined <- CCConsensusCauseDataBindcombined %>%
@@ -3157,6 +3181,12 @@ CCconsensuscausesummaryallcombined <- CCConsensusCauseDataBindAllcombined %>%
 
 CCconsensuscausesummaryallcombined
 
+samplesizes <- CCConsensusCauseDataBindAllcombined %>%
+  filter(Answer != "") %>%
+  group_by(prepost) %>%
+  summarise(n=n()) 
+
+samplesizes
 
 # order the responses
 CCconsensuscausesummaryallcombined$Answer <- factor(CCconsensuscausesummaryallcombined$Answer, 
@@ -3167,7 +3197,6 @@ CCconsensuscausesummaryallcombined$Answer <- factor(CCconsensuscausesummaryallco
                                    "Equally humans and natural",
                                    "Mostly humans"))
 
-
 ccconsensuscausestackedbarplotcombined <- ggplot(CCconsensuscausesummaryallcombined, aes(y=rel.freq, x=prepost)) + 
     geom_col(aes(fill=Answer)) +
   ylab("Percent of responses") +
@@ -3175,8 +3204,10 @@ ccconsensuscausestackedbarplotcombined <- ggplot(CCconsensuscausesummaryallcombi
   scale_fill_manual(values=c("gray","#bf812d","#d8b365","#f6e8c3","#ABD9D5","#01665e")) +
   ggtitle("What is the scientific consensus regarding \nthe cause(s) of climate change?") +
   guides(fill=guide_legend(title="Response")) +
+  ylim(0,105) +
+  annotate("text", x = 1, y = 105, label = paste("n = 372")) +
+  annotate("text", x = 2, y = 105, label = paste("n = 383")) +
   theme_bw()
-  
 
 ccconsensuscausestackedbarplotcombined
 
@@ -3184,16 +3215,11 @@ save_plot("ccconsensuscausestackedbarplotcombined.jpg", ccconsensuscausestackedb
 
 ```
 
+
+
 ## Scientists have a good understanding of whether climate change is occurring
 ### Views on scientific consensus about whether climate change is happening
 ```{r, analysis of scientists consensus on whether using combined data}
-preCCScientistsWhethercombined <- aggregate(data.frame(count = cctookbothcombined$CC_ScientistsWhether_pre), list(value = cctookbothcombined$CC_ScientistsWhether_pre), length)
-
-postCCScientistsWhethercombined <- aggregate(data.frame(count = cctookbothcombined$CC_ScientistsWhether_post), list(value = cctookbothcombined$CC_ScientistsWhether_post), length)
-
-preCCScientistsWhethercombined$prepost <- rep("pre",nrow(preCCScientistsWhethercombined))
-postCCScientistsWhethercombined$prepost <- rep("post",nrow(postCCScientistsWhethercombined))
-
 CCScientistsWhetherPrecombined <- cctookbothcombined$CC_ScientistsWhether_pre
 CCScientistsWhetherPrecombined <- as.data.frame(CCScientistsWhetherPrecombined)
 names(CCScientistsWhetherPrecombined)[1] = c("Answer")
@@ -3280,7 +3306,9 @@ likert_ccscientistswhethercombined <- likert(ccscientistswhetherresponsescombine
 ccscientistswhetherlikertplotcombined = plot(likert_ccscientistswhethercombined,legend.position="bottom",text.size=4) + 
   scale_y_continuous(limits=c(-100,150)) +
   coord_flip(ylim=c(-110,110)) +
-  theme(strip.text = element_text(margin=margin(4, 0, 4, 0),size=20))
+  theme(strip.text = element_text(margin=margin(4, 0, 4, 0),size=20)) +
+  annotate("text", x = 2, y = -50, label = paste("n = 367")) +
+  annotate("text", x = 1, y = -50, label = paste("n = 379"))
 
 ccscientistswhetherlikertplotcombined <- ggplot_gtable(ggplot_build(ccscientistswhetherlikertplotcombined))
 ccscientistswhetherlikertplotcombined$layout$clip <- "off"
@@ -3300,19 +3328,21 @@ CCScientistsWhetherDataBindcombinedsummary <- CCScientistsWhetherDataBindcombine
   mutate(rel.freq = round(100 * n/sum(n), 0))
 
 CCScientistsWhetherDataBindcombinedsummary
+
+samplesizes <- CCScientistsWhetherDataBindcombined %>%
+  group_by(prepost) %>%
+  summarise(n=n()) 
+
+samplesizes
 ```
 
-
+```{r, test for significant shift in scientists whether}
+stronglyagree <- prop.test(x = c(200, 303), n = c(372, 383))
+stronglyagree 
+```
 
 ## Views on scientific consensus on why climate change is happening
 ```{r, analysis of scientists consensus on why for combined data}
-preCCScientistsWhycombined <- aggregate(data.frame(count = cctookbothcombined$CC_ScientistsWhy_pre), list(value = cctookbothcombined$CC_ScientistsWhy_pre), length)
-
-postCCScientistsWhycombined <- aggregate(data.frame(count = cctookbothcombined$CC_ScientistsWhy_post), list(value = cctookbothcombined$CC_ScientistsWhy_post), length)
-
-preCCScientistsWhycombined$prepost <- rep("pre",nrow(preCCScientistsWhycombined))
-postCCScientistsWhycombined$prepost <- rep("post",nrow(postCCScientistsWhycombined))
-
 CCScientistsWhyPrecombined <- cctookbothcombined$CC_ScientistsWhy_pre
 CCScientistsWhyPrecombined <- as.data.frame(CCScientistsWhyPrecombined)
 names(CCScientistsWhyPrecombined)[1] = c("Answer")
@@ -3399,7 +3429,9 @@ likert_ccscientistswhycombined <- likert(ccscientistswhyresponsescombined, group
 ccscientistswhylikertplotcombined = plot(likert_ccscientistswhycombined,legend.position="bottom",text.size=4) + 
   scale_y_continuous(limits=c(-100,150)) +
   coord_flip(ylim=c(-110,110)) +
-  theme(strip.text = element_text(margin=margin(4, 0, 4, 0),size=20))
+  theme(strip.text = element_text(margin=margin(4, 0, 4, 0),size=20)) +
+  annotate("text", x = 2, y = -50, label = paste("n = 366")) +
+  annotate("text", x = 1, y = -50, label = paste("n = 381"))
 
 ccscientistswhylikertplotcombined <- ggplot_gtable(ggplot_build(ccscientistswhylikertplotcombined))
 ccscientistswhylikertplotcombined$layout$clip <- "off"
@@ -3418,7 +3450,19 @@ CCScientistsWhyDataBindcombinedsummary <- CCScientistsWhyDataBindcombined %>%
   mutate(rel.freq = round(100 * n/sum(n), 0))
 
 CCScientistsWhyDataBindcombinedsummary
+
+samplesizes <- CCScientistsWhyDataBindcombined %>%
+  group_by(prepost) %>%
+  summarise(n=n()) 
+
+samplesizes
 ```
+
+```{r, test for significant shift in scientists why}
+stronglyagree <- prop.test(x = c(105, 230), n = c(372, 383))
+stronglyagree 
+```
+
 ### Combined plot for whether & why combined data
 ```{r, combined whether & why plot for combined data}
 combinedccwhetherwhyplotcombined <- plot_grid(ccscientistswhetherlikertplotcombined, ccscientistswhylikertplotcombined, labels=c('A', 'B'), nrow=2, ncol=1)
@@ -3431,10 +3475,6 @@ save_plot("combinedccwhetherwhyplotcombined.jpg", combinedccwhetherwhyplotcombin
 ## Do students feel that the course changed how they think about climate change?
 
 ```{r, course changed views for combined data}
-postCCChangedMecombined <- aggregate(data.frame(count = cctookbothcombined$CC_ChangedMe_post), list(value = cctookbothcombined$CC_ChangedMe_post), length)
-
-postCCChangedMecombined$prepost <- rep("post",nrow(postCCChangedMecombined))
-
 CCChangedMePostcombined <- cctookbothcombined$CC_ChangedMe_post
 CCChangedMePostcombined <- as.data.frame(CCChangedMePostcombined)
 names(CCChangedMePostcombined)[1] = c("Answer")
@@ -3502,13 +3542,6 @@ save_plot("ccchangedmelikertplotcombined.jpg", ccchangedmelikertplotcombined, ba
 
 NOTE: I'm realizing now that it's a little weird that we asked this on the pre- and post- surveys, except it's also kind of interesting that we did!
 ```{r, how much thought using combined data}
-preCCThoughtcombined <- aggregate(data.frame(count = cctookbothcombined$CC_Thought_pre), list(value = cctookbothcombined$CC_Thought_pre), length)
-
-postCCThoughtcombined <- aggregate(data.frame(count = cctookbothcombined$CC_Thought_post), list(value = cctookbothcombined$CC_Thought_post), length)
-
-preCCThoughtcombined$prepost <- rep("pre",nrow(preCCThoughtcombined))
-postCCThoughtcombined$prepost <- rep("post",nrow(postCCThoughtcombined))
-
 CCThoughtPrecombined <- cctookbothcombined$CC_Thought_pre
 CCThoughtPrecombined <- as.data.frame(CCThoughtPrecombined)
 names(CCThoughtPrecombined)[1] = c("Answer")
@@ -3601,13 +3634,6 @@ save_plot("ccthoughtlikertplotcombined.jpg", ccthoughtlikertplotcombined, base_w
 
 ## How worried are students about climate change?
 ```{r, analysis of amount of worry combined data}
-preCCWorriedcombined <- aggregate(data.frame(count = cctookbothcombined$CC_Worried_pre), list(value = cctookbothcombined$CC_Worried_pre), length)
-
-postCCWorriedcombined <- aggregate(data.frame(count = cctookbothcombined$CC_Worried_post), list(value = cctookbothcombined$CC_Worried_post), length)
-
-preCCWorriedcombined$prepost <- rep("pre",nrow(preCCWorriedcombined))
-postCCWorriedcombined$prepost <- rep("post",nrow(postCCWorriedcombined))
-
 CCWorriedPrecombined <- cctookbothcombined$CC_Worried_pre
 CCWorriedPrecombined <- as.data.frame(CCWorriedPrecombined)
 names(CCWorriedPrecombined)[1] = c("Answer")
